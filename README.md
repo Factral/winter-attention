@@ -1,2 +1,4 @@
 # winter-attention
-notes about attention and transfomers
+This repository contains notes about attention mechanisms with code examples included
+
+# Luong Attention
