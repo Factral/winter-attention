@@ -7,4 +7,4 @@ This repository contains notes about attention mechanisms with code examples inc
 
 # Bahdanau Attention
 
-[Bahdanau Attention (Paper)](https://link-url-here.org)
+[Bahdanau Attention (Paper)](https://arxiv.org/pdf/1409.0473.pdf)
