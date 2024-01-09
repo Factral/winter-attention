@@ -32,7 +32,7 @@ class PatchEmbedding(nn.Module):
         self.embed_dim = embed_dim
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
         # b, embedding, n_patches_h, n_patches_w
-        
+
     def forward(self, x):
         x = self.proj(x)
         x = rearrange(x, 'b e n1 n2 -> b (n1 n2) e') # b, long, embedding
@@ -45,13 +45,16 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
 
         # key, query, value projections
-        self.key = nn.Linear(n_embd, n_embd)
-        self.query = nn.Linear(n_embd, n_embd)
-        self.value = nn.Linear(n_embd, n_embd)
+        self.key = nn.Linear(n_embd, n_embd * n_heads)
+        self.query = nn.Linear(n_embd, n_embd * n_heads)
+        self.value = nn.Linear(n_embd, n_embd * n_heads)
         self.n_heads = n_heads
 
         # output projection
-        self.proj = nn.Linear(n_embd, n_embd)
+        self.proj = nn.Linear(n_embd * n_heads, n_embd)
+
+        # for attention visualization
+        self.att_maps = []
 
     def forward(self, x):
         # B, L, F = x.size() # batch, length, features
@@ -62,9 +65,13 @@ class MultiHeadAttention(nn.Module):
 
         scores = q @ k.transpose(-2,-1) / math.sqrt(k.size(-1)) # B, H, L, L
         att = F.softmax(scores, dim=-1)
-        
+
+        self.att_maps.append(att) #just for visualization
+
         y = att @ v # B, H, L, F/H
+
         y = rearrange(y, 'b h l f -> b l (h f)')
+
 
         y = self.proj(y) # batch, length, feature
 
@@ -90,7 +97,7 @@ class TransformerEncoder(nn.Module):
     def __init__(self, n_embd, n_heads):
         super().__init__()
 
-        self.att = MultiHeadAttention(n_embd, n_heads)        
+        self.att = MultiHeadAttention(n_embd, n_heads)
         self.ln1 = torch.nn.LayerNorm(n_embd)
         self.ln2 = torch.nn.LayerNorm(n_embd)
         self.mlp = MultiLayerPerceptron(n_embd, n_embd)
@@ -99,9 +106,9 @@ class TransformerEncoder(nn.Module):
 
         x1 = self.ln1(x) #layer normalization
         x1 = self.att(x1) # multihead attention
-        
+
         x = x + x1 # residual connection
-        
+
         x2 = self.ln2(x) #layer normalization
         x2 = self.mlp(x2) # multilayer perceptron
 
@@ -118,7 +125,7 @@ class ViT(nn.Module):
 
         self.patch_embed = PatchEmbedding(patch__dim, 1, embed_dim)
         self.cls_token = nn.Parameter( torch.randn(1, 1, embed_dim))
-        
+
         n_patches = (img_dim // patch__dim) ** 2
         self.pos_embedding = nn.Parameter( torch.randn(1, n_patches+1, embed_dim))
 
@@ -132,8 +139,8 @@ class ViT(nn.Module):
         #cls token addition
         cls = repeat(self.cls_token, '1 1 f -> b 1 f', b=e.shape[0])
         e = torch.cat([cls, e], dim=1) + self.pos_embedding # (B, L+1, F)
-        
-        e += self.pos_embedding 
+
+        e += self.pos_embedding
 
         z = self.transformer(e) # (B, L+1, F)
 
@@ -149,7 +156,7 @@ model = ViT(img_dim=28,
             patch__dim=7, 
             embed_dim=49, 
             num_classes=10, 
-            n_heads=7, 
+            n_heads=3, 
             depth=2).to(device)
 
 criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -182,3 +189,4 @@ for epoch in range(5):
         correct += (predicted == labels).sum()
 
     print("Epoch: %d, Accuracy: %f" % (epoch, 100 * correct / total))
+
