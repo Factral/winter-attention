@@ -1,15 +1,31 @@
 # Winter-attention
+
 This repository contains notes about attention mechanisms with code examples included
 
-## attention definition tones
-[attention.MD](attention.MD)
+**this repo have a inductive bias towards vision transformers** * - *
 
+## Markdowns
 
-# Luong Attention
+- [Introduction to Attention](descriptions/attention.MDttention.MD)
 
-[Luong Attention (Paper)](https://arxiv.org/pdf/1508.04025.pdf)
+- [Why use Layer Normalization in Transformers?](descriptions/layer_normalization.MD)
 
-# Bahdanau Attention
+## Code Exploration
 
-[Bahdanau Attention (Paper)](https://arxiv.org/pdf/1409.0473.pdf)
+- [Cosine Similarity and vector similarity](code/vector_similarities.ipynb)
 
+- [Self-attention in MNIST](code/mnist_attention.py)
+
+- [Multi-head attention in MNIST](code/mnist_multihead_attention.py)
+
+- [How to use einsum](code/einsum.ipynb)
+
+- [How to use einops](code/einops.ipynb)
+
+## Vision Transformers
+
+- [What is a Vision Transformer?](vision/Vision%20Transformers.md)
+
+- [Vision Transformer in pytorch from scratch](vision/visionattention.py)
+
+- [Attention and positional encoding visualization](vision/attention%20rollout.ipynb)
