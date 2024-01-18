@@ -169,7 +169,8 @@ class PVT(nn.Module):
             setattr(self, f'pos_embed_{i}', pos_embed)
             setattr(self, f'transformer_block_{i}', transformer_block)
 
-        self.cls_token = nn.Parameter( torch.zeros(1, 1, embed_dims[-1]))
+        self.norm = nn.LayerNorm(embed_dims[-1])
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dims[-1]))
         self.MLP_head = nn.Linear(embed_dims[-1], num_classes)
 
 
@@ -189,8 +190,10 @@ class PVT(nn.Module):
                 transformer = transformer_block[j]
                 x = transformer(x, H, W)
 
+        x = self.norm(x)
+        x = self.MLP_head(x[:,0])
 
-        return y
+        return x
 
 
 
