@@ -8,6 +8,12 @@ Let's dive deep into the ViT (Vision Transformer) and how it works!!
 
 In ViT the images are represented as sequences like in NLP tasks, so the **first step in processing images with ViT is split images into fixed-size patches**.
 
+![Image to Patches](https://github.com/Factral/winter-attention/blob/main/images/patchify.png)
+
+These patches are ordered from top left to bottom right.
+
+![Patch sequence](https://github.com/Factral/winter-attention/blob/main/images/embedding_vit.png)
+
 Then each patch is flattened into a single vector, this allows ViT to treat patches as sequences of data. Then with learnable linear projection these flattened patches are mapped into a lower-dimensional space.
 
 But now we face a problem, how to preserve information order during the process? Keep in mind that this order is not inherent and the transformer itself can't capture it. This is where trainable positional embedding comes into play, these embeddings help the model to retain information about spatial relationships between patches.
