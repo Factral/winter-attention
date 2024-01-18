@@ -16,7 +16,6 @@ Before feed the sequence of patches to transformer encoder and perform classific
 
 Now, finally, the patch sequence is feed into the transformer block.
 ##### Vision Transformer Pre-training
-
 Pre-training on large-scale datasets is a key aspect in the effectiveness of most transformer-based models. Large-scale datasets offers a greater variety of image data, this allows the model to learn a larger feature space, which benefits the downstream tasks.
 
 ## Attention visualization
