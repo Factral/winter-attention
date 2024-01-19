@@ -27,7 +27,7 @@ test_loader = torch.utils.data.DataLoader(dataset=mnistDataset(test_dataset), ba
 
 
 class PatchEmbedding(nn.Module):
-    def __init__(self, patch_size=7, in_chans=1, embed_dim=49):
+    def __init__(self, patch_size, in_chans, embed_dim):
         super().__init__()
         self.patch_size = patch_size
         self.in_chans = in_chans
@@ -139,7 +139,7 @@ class TransformerEncoder(nn.Module):
 class PVT(nn.Module):
 
     def __init__(self,img_dim , in_chans, patch_dim, num_stages, embed_dims,
-                  num_channels, encoder_layers, reduction_ratio, n_heads,
+                 encoder_layers, reduction_ratio, n_heads,
                     expansion_ratio, num_classes):
         super().__init__()
 
@@ -147,12 +147,12 @@ class PVT(nn.Module):
         self.num_classes = num_classes
         self.encoder_layer = encoder_layers #model depth
         
-        self.patch_embed = PatchEmbedding(embed_dims[0], 1, embed_dims[0])
+        #self.patch_embed = PatchEmbedding(embed_dims[0], 1, embed_dims[0])
 
 
         for i in range(num_stages):
             patch_embed = PatchEmbedding(patch_size=patch_dim if i == 0 else 2,
-                                         in_chans=in_chans if i == 0 else num_channels[i-1],
+                                         in_chans=in_chans if i == 0 else embed_dims[i-1],
                                          embed_dim=embed_dims[i])
             
             img_dim = img_dim // (2  ** (i+1)) if i != 0 else img_dim
@@ -162,7 +162,7 @@ class PVT(nn.Module):
             pos_embed = nn.Parameter(torch.zeros(1, n_patches, embed_dims[i]) ) 
 
             transformer_block = nn.ModuleList([TransformerEncoder(n_embd=embed_dims[i],n_heads=n_heads[i],
-                                                                  reduction_ratio=reduction_ratio, expansion_ratio=expansion_ratio
+                                                                  reduction_ratio=reduction_ratio[i], expansion_ratio=expansion_ratio[i]
                                                                   ) for _ in range(encoder_layers[i])])
             
             setattr(self, f'patch_embed_{i}', patch_embed)
@@ -196,35 +196,18 @@ class PVT(nn.Module):
         return x
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = ViT(img_dim=28,
-            patch__dim=7, 
-            embed_dim=49, 
-            num_classes=10, 
-            n_heads=3, 
-            depth=2).to(device)
+model = PVT(img_dim=28,
+            in_chans=1,
+            patch_dim=4, 
+            num_stages=4,
+            embed_dims=[32,64,128,256], 
+            encoder_layers=[2,2,2,2],
+            reduction_ratio=[8,4,2,1],
+            n_heads=[1,2,5,8],
+            expansion_ratio=[8,8,4,4],
+            num_classes=10).to(device)
 
 criterion = torch.nn.CrossEntropyLoss().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
