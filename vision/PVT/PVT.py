@@ -6,24 +6,17 @@ from torchvision import datasets, transforms
 from einops import rearrange, repeat
 import math
 
+preprocess = transforms.Compose([
+    transforms.Resize((256,256)),
+    transforms.ToTensor()
+    ])
 
-train_dataset = datasets.MNIST(root='./data/', train=True, transform=transforms.ToTensor(), download=True)
-test_dataset = datasets.MNIST(root='./data/', train=False, transform=transforms.ToTensor(), download=True)
+train_dataset = datasets.CIFAR10(root='./data/',train=True, transform=preprocess, download=True)
+test_dataset = datasets.CIFAR10(root='./data/', train=False, transform=preprocess, download=True)
 
-class mnistDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset):
-        self.dataset = dataset
 
-    def __getitem__(self, index):
-        img, label = self.dataset[index]
-        return img, label
-
-    def __len__(self):
-        return len(self.dataset)
-    
-train_loader = torch.utils.data.DataLoader(dataset=mnistDataset(train_dataset), batch_size=64, shuffle=True)
-test_loader = torch.utils.data.DataLoader(dataset=mnistDataset(test_dataset), batch_size=64, shuffle=True)
-
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=64, shuffle=True)
 
 
 class PatchEmbedding(nn.Module):
@@ -90,9 +83,10 @@ class MultiHeadAttention(nn.Module):
         
         if self.reduction_ratio > 1:
             # f = h*w
-            x = rearrange(x, 'b l f -> b l h w', h=H, w=W)
+
+            x = rearrange(x, 'b (h w) f -> b f h w', h=H, w=W)
             x = self.sr(x)
-            x = rearrange(x, 'b l n1 n2 -> b (n1 n2) f')
+            x = rearrange(x, 'b e n1 n2 -> b (n1 n2) e')
             x = self.norm(x)
 
         k = rearrange(self.key(x), 'b l (h f) -> b h l f', h=self.n_heads) # (B, L, F) -> (B, H, L, F/H)
@@ -155,15 +149,16 @@ class PVT(nn.Module):
                                          in_chans=in_chans if i == 0 else embed_dims[i-1],
                                          embed_dim=embed_dims[i])
             
-            img_dim = img_dim // (2  ** (i+1)) if i != 0 else img_dim
+            img_dim = 256 // (2  ** (i+1)) if i != 0 else img_dim
             n_patches = (img_dim // patch_dim) ** 2 if i == 0 else (img_dim // 2) ** 2
-            n_patches = n_patches if i != num_stages - 1 else n_patches+ 1
+            n_patches = n_patches if i != num_stages - 1 else n_patches + 1
 
             pos_embed = nn.Parameter(torch.zeros(1, n_patches, embed_dims[i]) ) 
 
-            transformer_block = nn.ModuleList([TransformerEncoder(n_embd=embed_dims[i],n_heads=n_heads[i],
-                                                                  reduction_ratio=reduction_ratio[i], expansion_ratio=expansion_ratio[i]
-                                                                  ) for _ in range(encoder_layers[i])])
+            transformer_block = nn.ModuleList([
+                TransformerEncoder(n_embd=embed_dims[i],n_heads=n_heads[i],
+                                    reduction_ratio=reduction_ratio[i], expansion_ratio=expansion_ratio[i])
+                                    for _ in range(encoder_layers[i])])
             
             setattr(self, f'patch_embed_{i}', patch_embed)
             setattr(self, f'pos_embed_{i}', pos_embed)
@@ -185,28 +180,42 @@ class PVT(nn.Module):
             transformer_block = getattr(self, f'transformer_block_{i}')
 
             x, (H, W) = patch_embed(x)
-            x = x + pos_embed
-            for j in range(self.encoder_layer[i]):
-                transformer = transformer_block[j]
-                x = transformer(x, H, W)
+            
+            #print(H,W)
 
-        x = self.norm(x)
-        x = self.MLP_head(x[:,0])
+            if i == self.num_stages - 1:
+                cls_tokens = repeat(self.cls_token, '() 1 e -> b 1 e', b=B)
+                x = torch.cat((cls_tokens, x), dim=1) # (B, L+1, F)
+            
+            print(x.shape, pos_embed.shape)
+            x = x + pos_embed
+            for blk in transformer_block:
+                x = blk(x, H, W)
+
+            if i != self.num_stages - 1:
+                x = rearrange(x, 'b (h w) f -> b f h w', h=H, w=W) 
+
+
+        x = x[:, 0, :]
+        #x = self.norm(x)
+
+        x = self.MLP_head(x)
+
 
         return x
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = PVT(img_dim=28,
-            in_chans=1,
+model = PVT(img_dim=256,
+            in_chans=3,
             patch_dim=4, 
             num_stages=4,
-            embed_dims=[32,64,128,256], 
-            encoder_layers=[2,2,2,2],
-            reduction_ratio=[8,4,2,1],
-            n_heads=[1,2,5,8],
-            expansion_ratio=[8,8,4,4],
+            embed_dims=[64, 128, 256, 512], 
+            encoder_layers=[1, 1, 1, 1],
+            reduction_ratio=[4, 2, 2, 1],
+            n_heads=[1, 2, 4, 8],
+            expansion_ratio=[6, 6, 4 ,4],
             num_classes=10).to(device)
 
 criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -233,6 +242,10 @@ for epoch in range(5):
     total = 0
     
     for images, labels in test_loader:
+
+        images = images.to(device)
+        labels = labels.to(device)
+
         outputs = model(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
