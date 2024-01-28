@@ -7,23 +7,6 @@ from einops import rearrange, repeat
 import math
 
 
-train_dataset = datasets.MNIST(root='./data/', train=True, transform=transforms.ToTensor(), download=True)
-test_dataset = datasets.MNIST(root='./data/', train=False, transform=transforms.ToTensor(), download=True)
-
-class mnistDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset):
-        self.dataset = dataset
-
-    def __getitem__(self, index):
-        img, label = self.dataset[index]
-        return img, label
-
-    def __len__(self):
-        return len(self.dataset)
-    
-train_loader = torch.utils.data.DataLoader(dataset=mnistDataset(train_dataset), batch_size=64, shuffle=True)
-test_loader = torch.utils.data.DataLoader(dataset=mnistDataset(test_dataset), batch_size=64, shuffle=True)
-
 class PatchEmbedding(nn.Module):
     def __init__(self, patch_size=7, in_chans=1, embed_dim=49):
         super().__init__()
@@ -53,8 +36,6 @@ class MultiHeadAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(n_embd * n_heads, n_embd)
 
-        # for attention visualization
-        self.att_maps = []
 
     def forward(self, x):
         # B, L, F = x.size() # batch, length, features
@@ -65,8 +46,6 @@ class MultiHeadAttention(nn.Module):
 
         scores = q @ k.transpose(-2,-1) / math.sqrt(k.size(-1)) # B, H, L, L
         att = F.softmax(scores, dim=-1)
-
-        self.att_maps.append(att) #just for visualization
 
         y = att @ v # B, H, L, F/H
 
@@ -150,43 +129,11 @@ class ViT(nn.Module):
 
         return y
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 model = ViT(img_dim=28,
             patch__dim=7, 
             embed_dim=49, 
             num_classes=10, 
             n_heads=3, 
-            depth=2).to(device)
-
-criterion = torch.nn.CrossEntropyLoss().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
-
-for epoch in range(5):
-
-    for i, (images, labels) in enumerate(train_loader):
-
-        images = images.to(device)
-        labels = labels.to(device)
-
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        if i % 100 == 0:
-            print("Epoch: %d, Batch: %d, Loss: %f" % (epoch, i, loss.item()))
-
-
-    correct = 0
-    total = 0
-    
-    for images, labels in test_loader:
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum()
-
-    print("Epoch: %d, Accuracy: %f" % (epoch, 100 * correct / total))
-
+            depth=2)

@@ -6,17 +6,6 @@ from torchvision import datasets, transforms
 from einops import rearrange, repeat
 import math
 
-preprocess = transforms.Compose([
-    transforms.Resize((256,256)),
-    transforms.ToTensor()
-    ])
-
-train_dataset = datasets.CIFAR10(root='./data/',train=True, transform=preprocess, download=True)
-test_dataset = datasets.CIFAR10(root='./data/', train=False, transform=preprocess, download=True)
-
-
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=64, shuffle=True)
 
 
 class PatchEmbedding(nn.Module):
@@ -204,52 +193,4 @@ class PVT(nn.Module):
 
         return x
 
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-model = PVT(img_dim=256,
-            in_chans=3,
-            patch_dim=4, 
-            num_stages=4,
-            embed_dims=[64, 128, 256, 512], 
-            encoder_layers=[1, 1, 1, 1],
-            reduction_ratio=[4, 2, 2, 1],
-            n_heads=[1, 2, 4, 8],
-            expansion_ratio=[6, 6, 4 ,4],
-            num_classes=10).to(device)
-
-criterion = torch.nn.CrossEntropyLoss().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
-
-for epoch in range(5):
-
-    for i, (images, labels) in enumerate(train_loader):
-
-        images = images.to(device)
-        labels = labels.to(device)
-
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        if i % 100 == 0:
-            print("Epoch: %d, Batch: %d, Loss: %f" % (epoch, i, loss.item()))
-
-
-    correct = 0
-    total = 0
-    
-    for images, labels in test_loader:
-
-        images = images.to(device)
-        labels = labels.to(device)
-
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum()
-
-    print("Epoch: %d, Accuracy: %f" % (epoch, 100 * correct / total))
 
