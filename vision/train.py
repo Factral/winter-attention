@@ -13,6 +13,7 @@ import argparse
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Model Selection Script')
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use')
+    parser.add_argument('--resize', type=bool, default=False, help='Resize the images to 256x256')
     args = parser.parse_args()
 
     # Cargar el modelo usando la función en otro archivo
@@ -21,11 +22,15 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-
-    preprocess = transforms.Compose([
-        transforms.Resize((256,256)),
-        transforms.ToTensor()
-        ])
+    if args.resize:
+        preprocess = transforms.Compose([
+            transforms.Resize((256,256)),
+            transforms.ToTensor()
+            ])
+    else:
+        preprocess = transforms.Compose([
+            transforms.ToTensor()
+            ])
 
     train_dataset = datasets.CIFAR10(root='./data/',train=True, transform=preprocess, download=True)
     test_dataset = datasets.CIFAR10(root='./data/', train=False, transform=preprocess, download=True)
