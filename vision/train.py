@@ -42,6 +42,8 @@ if __name__ == "__main__":
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
 
+
+    scaler = torch.cuda.amp.GradScaler()
     for epoch in range(5):
 
         for i, (images, labels) in enumerate(train_loader):
@@ -50,10 +52,14 @@ if __name__ == "__main__":
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+
+            with torch.cuda.amp.autocast(dtype=torch.float16):
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             if i % 100 == 0:
                 print("Epoch: %d, Batch: %d, Loss: %f" % (epoch, i, loss.item()))
@@ -62,13 +68,14 @@ if __name__ == "__main__":
         correct = 0
         total = 0
         
-        for images, labels in test_loader:
-            images = images.to(device)
-            labels = labels.to(device)
-            outputs = model(images)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum()
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images = images.to(device)
+                labels = labels.to(device)
+                outputs = model(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum()
 
         print("Epoch: %d, Accuracy: %f" % (epoch, 100 * correct / total))
 
