@@ -19,7 +19,7 @@ def load_model(model_name):
             patch_dim=4, 
             num_stages=4,
             embed_dims=[64, 128, 256, 512], 
-            encoder_layers=[1, 1, 1, 1],
+            encoder_layers=[2, 2, 2, 2],
             reduction_ratio=[4, 2, 2, 1],
             n_heads=[1, 2, 4, 8],
             expansion_ratio=[6, 6, 4 ,4],

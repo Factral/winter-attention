@@ -155,7 +155,6 @@ class SwinBlock(nn.Module):
         )
 
     def forward(self, x):
-        print(x.shape)
         x = self.norm1(x)
         x = self.msa(x) + x
         x = self.norm2(x)
@@ -215,7 +214,6 @@ class SwinTransformer(nn.Module):
         for stage in self.stages:
             x = stage(x)
 
-        print(x.shape)
         x = x.mean(dim=[2,3])
 
         return self.mlp_head(x)
