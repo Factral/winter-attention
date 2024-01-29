@@ -8,7 +8,7 @@ import math
 
 
 class PatchEmbedding(nn.Module):
-    def __init__(self, patch_size=7, in_chans=1, embed_dim=49):
+    def __init__(self, patch_size=7, in_chans=3, embed_dim=49):
         super().__init__()
         self.patch_size = patch_size
         self.in_chans = in_chans

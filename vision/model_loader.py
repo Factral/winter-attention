@@ -5,8 +5,8 @@ from architectures import ViT, PVT, SwinTransformer
 def load_model(model_name):
     if model_name == 'vit':
        
-        model = ViT(img_dim=28,
-            patch__dim=7, 
+        model = ViT(img_dim=32,
+            patch__dim=8, 
             embed_dim=49, 
             num_classes=10, 
             n_heads=3, 
