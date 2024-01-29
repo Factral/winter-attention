@@ -89,7 +89,7 @@ class W_MSA(nn.Module):
 
     def forward(self, x):
         b, n_h, n_w, c = x.shape
-        assert c % h == 0, 'dimensions must be divisible by number of heads'
+        assert c % self.heads == 0, 'dimensions must be divisible by number of heads'
 
         if self.shifted:
             x = self.cyclic_shift(x)
@@ -103,16 +103,15 @@ class W_MSA(nn.Module):
         nw_w = n_w // self.window_size
 
         # batch, n_h, n_w, head_dim * 3 
-
         q, k, v = map(
-            lambda t: rearrange(t, 'b (nw_h w) (nw_w w) (h d) -> b h (nw_h nw_w) (w w) d',
-                                 h=h, w=self.windows_size), qkv)
+            lambda t: rearrange(t, 'b (nw_h w_h) (nw_w w_w) (h d) -> b h (nw_h nw_w) (w_h w_w) d',
+                                h=h, w_h=self.window_size, w_w=self.window_size), qkv)
 
-        # batch, heads, n_patches, windows_size^2, head_dim
+        # batch, heads, n_patches, window_size^2, head_dim
         
         dots = einsum('b h w i d, b h w j d -> b h w i j', q, k) * (k.size(-1) ** -0.5)
 
-        #batch, heads, n_patches, windows_size^2, windows_size^2
+        #batch, heads, n_patches, window_size^2, window_size^2
 
         dots += self.pos_emb
 
@@ -124,7 +123,7 @@ class W_MSA(nn.Module):
 
         out = einsum('b h w i d, b h w d j -> b h w i j', attn, v)
         
-        # batch, heads, n_patches, windows_size^2, head_dim
+        # batch, heads, n_patches, window_size^2, head_dim
 
         out = rearrange(out, 'b h (nw_h nw_w) (w_h w_w) d -> b (nw_h w_h) (nw_w w_w) (h d)',
                         h=h, w_h=self.window_size, w_w=self.window_size, nw_h=nw_h, nw_w=nw_w)
@@ -168,10 +167,15 @@ class Stage(nn.Module):
 
         self.layers = nn.ModuleList([])
         for _ in range(layers // 2):
-            self.layers.append(SwinBlock(dim=hidden_dim, heads=heads, shifted=False, window_size=window_size,
-                                         mlp_dim=hidden_dim * 4))
-            self.layers.append(SwinBlock(dim=hidden_dim, heads=heads, shifted=True, window_size=window_size,
-                                         mlp_dim=hidden_dim * 4))
+            self.layers.append(
+                nn.ModuleList([
+                    SwinBlock(dim=hidden_dim, heads=heads, shifted=False, window_size=window_size,
+                              mlp_dim=hidden_dim * 4),
+                    SwinBlock(dim=hidden_dim, heads=heads, shifted=True, window_size=window_size,
+                              mlp_dim=hidden_dim * 4)
+                ]))
+            
+
             
     def forward(self, x):
         x = self.patch_partition(x)

@@ -13,7 +13,7 @@ import argparse
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Model Selection Script')
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use')
-    parser.add_argument('--resize', type=bool, default=False, help='Resize the images to 256x256')
+    parser.add_argument('--resize', type=int, default=0, help='Resize the images to a square of this size')
     args = parser.parse_args()
 
     # Cargar el modelo usando la función en otro archivo
@@ -22,9 +22,9 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    if args.resize:
+    if args.resize != 0:
         preprocess = transforms.Compose([
-            transforms.Resize((256,256)),
+            transforms.Resize((args.resize ,args.resize )),
             transforms.ToTensor()
             ])
     else:
