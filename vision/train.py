@@ -63,6 +63,8 @@ if __name__ == "__main__":
         total = 0
         
         for images, labels in test_loader:
+            images = images.to(device)
+            labels = labels.to(device)
             outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
