@@ -102,7 +102,7 @@ class ViT(nn.Module):
         super().__init__()
 
 
-        self.patch_embed = PatchEmbedding(patch__dim, 1, embed_dim)
+        self.patch_embed = PatchEmbedding(patch__dim, 3, embed_dim)
         self.cls_token = nn.Parameter( torch.randn(1, 1, embed_dim))
 
         n_patches = (img_dim // patch__dim) ** 2
