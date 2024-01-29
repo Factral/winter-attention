@@ -3,8 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+from torch import einsum
 from torchvision import datasets, transforms
-from einops import rearrange, repeat, einsum
+from einops import rearrange, repeat
+from einops.layers.torch import Rearrange
 
 
 class PatchEmbedding(nn.Module):
@@ -22,6 +24,7 @@ class PatchEmbedding(nn.Module):
     def forward(self, x):
         x = self.proj(x)
         x = rearrange(x, 'b c n1 n2 -> b n1 n2 c') # b, n_w, n_h, c
+
         return x
     
 
@@ -47,6 +50,7 @@ def create_mask(window_size, displacement, upper_lower, left_right):
         mask[:, :-displacement, :, -displacement:] = float('-inf')
         mask = rearrange(mask, 'h1 w1 h2 w2 -> (h1 w1) (h2 w2)')
 
+    return mask
 
 class MultiLayerPerceptron(nn.Module):
     def __init__(self, n_embd, hidden_dim):
@@ -151,6 +155,7 @@ class SwinBlock(nn.Module):
         )
 
     def forward(self, x):
+        print(x.shape)
         x = self.norm1(x)
         x = self.msa(x) + x
         x = self.norm2(x)
@@ -172,7 +177,7 @@ class Stage(nn.Module):
                     SwinBlock(dim=hidden_dim, heads=heads, shifted=False, window_size=window_size,
                               mlp_dim=hidden_dim * 4),
                     SwinBlock(dim=hidden_dim, heads=heads, shifted=True, window_size=window_size,
-                              mlp_dim=hidden_dim * 4)
+                              mlp_dim=hidden_dim * 4),
                 ]))
             
 
@@ -182,6 +187,8 @@ class Stage(nn.Module):
         for regular_block, shifted_block in self.layers:
             x = regular_block(x)
             x = shifted_block(x)
+
+        x = rearrange(x, 'b h w c -> b c h w')
         return x
     
 
@@ -192,8 +199,8 @@ class SwinTransformer(nn.Module):
         self.stages = nn.ModuleList([])
         for i in range(len(layers)):
             self.stages.append(
-                Stage(  in_chans = in_chans if i == 0 else hidden_dim * 2,
-                        hidden_dim = hidden_dim  if i == 0 else hidden_dim * 2,
+                Stage(  in_chans = in_chans if i == 0 else hidden_dim * ((2**i)//2),
+                        hidden_dim = hidden_dim  if i == 0 else hidden_dim * (2**i),
                         layers = layers[i],
                         downscaling_factor = downscaling_factors[i],
                         heads = heads[i],
@@ -208,6 +215,7 @@ class SwinTransformer(nn.Module):
         for stage in self.stages:
             x = stage(x)
 
+        print(x.shape)
         x = x.mean(dim=[2,3])
 
         return self.mlp_head(x)
