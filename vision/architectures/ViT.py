@@ -58,9 +58,10 @@ class MultiHeadAttention(nn.Module):
 
 
 class MultiLayerPerceptron(nn.Module):
-    def __init__(self, n_embd, hidden_dim):
+    def __init__(self, n_embd, mlp_ratio):
         super().__init__()
 
+        hidden_dim = int(n_embd * mlp_ratio)
         self.MLP = nn.Sequential(
             nn.Linear(n_embd, hidden_dim),
             nn.GELU(),
@@ -73,13 +74,13 @@ class MultiLayerPerceptron(nn.Module):
 
 
 class TransformerEncoder(nn.Module):
-    def __init__(self, n_embd, n_heads):
+    def __init__(self, n_embd, n_heads, mlp_ratio):
         super().__init__()
 
         self.att = MultiHeadAttention(n_embd, n_heads)
         self.ln1 = torch.nn.LayerNorm(n_embd)
         self.ln2 = torch.nn.LayerNorm(n_embd)
-        self.mlp = MultiLayerPerceptron(n_embd, n_embd)
+        self.mlp = MultiLayerPerceptron(n_embd, mlp_ratio)
 
     def forward(self, x):
 
@@ -98,17 +99,17 @@ class TransformerEncoder(nn.Module):
 
 class ViT(nn.Module):
 
-    def __init__(self,img_dim , patch__dim=7, embed_dim=100, num_classes=10, n_heads=8, depth=2):
+    def __init__(self,img_dim= 224 , patch_dim=7, embed_dim=100, num_classes=10, n_heads=8, depth=2, mlp_ratio=.4):
         super().__init__()
 
 
-        self.patch_embed = PatchEmbedding(patch__dim, 3, embed_dim)
+        self.patch_embed = PatchEmbedding(patch_dim, 3, embed_dim)
         self.cls_token = nn.Parameter( torch.randn(1, 1, embed_dim))
 
-        n_patches = (img_dim // patch__dim) ** 2
+        n_patches = (img_dim // patch_dim) ** 2
         self.pos_embedding = nn.Parameter( torch.randn(1, n_patches+1, embed_dim))
 
-        self.transformer = nn.Sequential(*[TransformerEncoder(embed_dim, n_heads) for _ in range(depth)])
+        self.transformer = nn.Sequential(*[TransformerEncoder(embed_dim, n_heads, mlp_ratio) for _ in range(depth)])
         self.MLP_head = nn.Linear(embed_dim, num_classes)
 
     def forward(self, x):
@@ -132,7 +133,7 @@ class ViT(nn.Module):
 
 
 model = ViT(img_dim=28,
-            patch__dim=7, 
+            patch_dim=7, 
             embed_dim=49, 
             num_classes=10, 
             n_heads=3, 
