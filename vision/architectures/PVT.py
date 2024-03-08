@@ -7,7 +7,6 @@ from einops import rearrange, repeat
 import math
 
 
-
 class PatchEmbedding(nn.Module):
     def __init__(self, patch_size, in_chans, embed_dim):
         super().__init__()
@@ -19,7 +18,7 @@ class PatchEmbedding(nn.Module):
         self.norm = nn.LayerNorm(embed_dim) 
 
     def forward(self, x):
-        B, C, H, W = x.size()
+        _, _, H, W = x.size()
 
         x = self.proj(x)
         x = rearrange(x, 'b e n1 n2 -> b (n1 n2) e') # b, long, embedding
@@ -85,10 +84,7 @@ class MultiHeadAttention(nn.Module):
         att = F.softmax(scores, dim=-1)
 
         y = att @ v # B, H, L, F/H
-
         y = rearrange(y, 'b h l f -> b l (h f)')
-
-
         y = self.proj(y) # batch, length, feature
 
         return y
@@ -169,14 +165,11 @@ class PVT(nn.Module):
             transformer_block = getattr(self, f'transformer_block_{i}')
 
             x, (H, W) = patch_embed(x)
-            
-            #print(H,W)
 
             if i == self.num_stages - 1:
                 cls_tokens = repeat(self.cls_token, '() 1 e -> b 1 e', b=B)
                 x = torch.cat((cls_tokens, x), dim=1) # (B, L+1, F)
             
-            print(x.shape, pos_embed.shape)
             x = x + pos_embed
             for blk in transformer_block:
                 x = blk(x, H, W)
@@ -184,13 +177,8 @@ class PVT(nn.Module):
             if i != self.num_stages - 1:
                 x = rearrange(x, 'b (h w) f -> b f h w', h=H, w=W) 
 
-
+        x = self.norm(x)
         x = x[:, 0, :]
-        #x = self.norm(x)
-
         x = self.MLP_head(x)
 
-
         return x
-
-

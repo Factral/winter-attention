@@ -8,6 +8,7 @@ from model_loader import load_model
 
 import math
 import argparse
+import tqdm as tqdm
 
 
 if __name__ == "__main__":
@@ -15,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use')
     parser.add_argument('--resize', type=int, default=0, help='Resize the images to a square of this size')
     parser.add_argument('--batch', type=int, default=64, help='Batch size for training')
+    parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
     args = parser.parse_args()
 
     # Cargar el modelo usando la función en otro archivo
@@ -47,13 +49,14 @@ if __name__ == "__main__":
 
 
     scaler = torch.cuda.amp.GradScaler()
-    for epoch in range(5):
+    for epoch in range(args.epochs):
 
         model.train()
-        for i, (images, labels) in enumerate(train_loader):
-
-            images = images.to(device)
-            labels = labels.to(device)
+        train_loss = 0
+        train_iter = 0
+        for _, batch in enumerate(tqdm(train_loader, desc = "Epoch")):
+            batch = tuple(b.to(device) for b in batch)
+            images, labels = batch
 
             optimizer.zero_grad()
 
@@ -65,22 +68,32 @@ if __name__ == "__main__":
             scaler.step(optimizer)
             scaler.update()
 
-            if i % 100 == 0:
-                print("Epoch: %d, Batch: %d, Loss: %f" % (epoch, i, loss.item()))
+            train_loss += loss.item()
+            train_iter += 1
 
-
+        train_loss = loss / train_iter
         correct = 0
         total = 0
-        
-        model.eval()
-        with torch.no_grad():
-            for images, labels in test_loader:
-                images = images.to(device)
-                labels = labels.to(device)
-                outputs = model(images)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum()
 
-        print("Epoch: %d, Accuracy: %f" % (epoch, 100 * correct / total))
+        if epoch % 5 == 0:
+            total, correct = 0, 0
+            model.eval()
+            with torch.no_grad():
+                for _, batch in enumerate(tqdm(test_loader, desc = "Epoch")):
+                    batch = tuple(b.to(device) for b in batch)
+                    images, labels = batch
+                    outputs = model(images)
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum()
+
+            acc = (correct / total).item()
+            print('\nEval at epoch: %d train_loss: %f Accuracy: %f' % (epoch, train_loss, acc))
+   
+
+
+
+
+
+
 
