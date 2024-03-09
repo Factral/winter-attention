@@ -16,7 +16,8 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use')
     parser.add_argument('--resize', type=int, default=0, help='Resize the images to a square of this size')
     parser.add_argument('--batch', type=int, default=64, help='Batch size for training')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
+    parser.add_argument('--eval_interval', type=int, default=5, help='Eval after n epochs')
     args = parser.parse_args()
 
     # Cargar el modelo usando la función en otro archivo
@@ -75,7 +76,7 @@ if __name__ == "__main__":
         correct = 0
         total = 0
 
-        if epoch % 5 == 0:
+        if epoch % args.eval_interval == 0:
             total, correct = 0, 0
             model.eval()
             with torch.no_grad():
