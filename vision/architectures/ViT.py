@@ -8,7 +8,7 @@ import math
 
 
 class PatchEmbedding(nn.Module):
-    def __init__(self, patch_size=7, in_chans=3, embed_dim=49):
+    def __init__(self, patch_size=8, in_chans=3, embed_dim=192):
         super().__init__()
         self.patch_size = patch_size
         self.in_chans = in_chans
@@ -114,7 +114,7 @@ class ViT(nn.Module):
 
     def forward(self, x):
 
-        e = self.patch_embed(x) # (B, L, F)
+        e = self.patch_embed(x) # (B, L, F) 
 
         #cls token addition
         cls = repeat(self.cls_token, '1 1 f -> b 1 f', b=e.shape[0])
@@ -130,11 +130,3 @@ class ViT(nn.Module):
 
         return y
 
-
-
-model = ViT(img_dim=28,
-            patch_dim=7, 
-            embed_dim=49, 
-            num_classes=10, 
-            n_heads=3, 
-            depth=2)

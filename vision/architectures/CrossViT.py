@@ -25,33 +25,33 @@ class PatchEmbedding(nn.Module):
         x = rearrange(x, 'b e n1 n2 -> b (n1 n2) e') # b, long, embedding
 
         return x
-    
+
 class MultiLayerPerceptron(nn.Module):
-    def __init__(self, n_embd, hidden_dim):
+    def __init__(self, input_dim, hidden_dim):
         super().__init__()
 
         self.MLP = nn.Sequential(
-            nn.Linear(n_embd, hidden_dim),
+            nn.Linear(input_dim, hidden_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, n_embd),
+            nn.Linear(hidden_dim, input_dim),
         )
 
     def forward(self,x):
         x = self.MLP(x)
         return x
-    
+
 class CrossAttention(nn.Module):
-    def __init__(self, n_embed, n_heads):
+    def __init__(self, dim, n_heads):
         super().__init__()
 
         self.n_heads = n_heads
-        #head_dims = n_embed // n_heads
+        #head_dims = dim // n_heads
 
-        self.key = nn.Linear(n_embed, n_embed)
-        self.query = nn.Linear(n_embed, n_embed)
-        self.value = nn.Linear(n_embed, n_embed)
+        self.key = nn.Linear(dim, dim)
+        self.query = nn.Linear(dim, dim)
+        self.value = nn.Linear(dim, dim)
 
-        self.proj = nn.Linear(n_embed, n_embed)
+        self.proj = nn.Linear(dim, dim)
 
     def forward(self, x):
         B, L, E = x.size()
@@ -69,9 +69,63 @@ class CrossAttention(nn.Module):
         return y 
     
 class CrossAttentionBlock(nn.Module):
-    def __init__(self, n_embed, n_heads, mlp_ratio=4., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+    def __init__(self, dim, n_heads, mlp_ratio=4., has_mlp=False):
         super().__init__()
-        self.n_embed = n_embed
-        self.n_heads = n_heads
+        self.has_mlp = has_mlp
 
-        mlp_hidden_dim = int(n_embed * mlp_ratio)
+        self.ln1 = nn.LayerNorm(dim)
+        self.attn = CrossAttention(dim, n_heads = n_heads)
+        self.ln2 = nn.LayerNorm(dim)
+        if has_mlp:
+            mlp_hidden_dim = int(dim * mlp_ratio)
+            self.mlp = MultiLayerPerceptron(dim, mlp_hidden_dim)
+
+    def forward(self, x):
+        x = x[:,0,...] + self.attn(self.ln1(x))
+
+        if self.has_mlp:
+            x = x + self.mlp(self.ln2(x))
+        return x
+    
+class BasicTransformerBlock(nn.Module):
+    def __init__(self, dim, n_heads, mlp_hidden_dim):
+        super().__init__()
+
+        self.att = CrossAttention(dim, n_heads)
+        self.ln1 = torch.nn.LayerNorm(dim)
+        self.ln2 = torch.nn.LayerNorm(dim)
+        self.mlp = MultiLayerPerceptron(dim, mlp_hidden_dim)
+
+    def forward(self, x):
+
+        x1 = self.ln1(x) #layer normalization
+        x1 = self.att(x1) # multihead attention
+
+        x = x + x1 # residual connection
+
+        x2 = self.ln2(x) #layer normalization
+        x2 = self.mlp(x2) # multilayer perceptron
+
+        y = x + x2 # residual connection
+
+        return y
+
+class MultiScaleTransformerEncoder(nn.Module):
+    def __init__(self, dim, patches, n_heads, depths, mlp_ratio):
+        super().__init__()
+
+        num_branches = len(dim)
+        mlp_hidden_dims = dim * mlp_ratio
+        self.num_branches = num_branches
+
+        self.blocks = nn.ModuleList([])
+        for branch in range(num_branches):
+            self.blocks = nn.Sequentia(*[BasicTransformerBlock(dim=dim[branch], n_heads=n_heads[branch], mlp_hidden_dim=mlp_hidden_dims) for _ in range(depths)])
+
+        self.projs = nn.ModuleList([])
+        for branch in range(num_branches):
+            self.projs = nn.Sequential(*[nn.LayerNorm(dim[branch]), nn.GELU(), nn.Linear(dim[branch], dim[(branch+1) % num_branches])])
+
+        self.fusion = nn.ModuleList([])
+        for branch in range(num_branches):
+            self.fusion = nn.Sequential(*[])
